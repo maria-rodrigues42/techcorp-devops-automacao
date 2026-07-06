@@ -1,0 +1,256 @@
+---
+# CENÁRIO 1: Provisionamento Padronizado das Máquinas de Desenvolvimento
+#
+# Uso: ansible-playbook -i inventories/hosts.yml cenario1-provisioning.yml --ask-become-pass
+#
+# O que este playbook faz:
+#   1. Instala dependências de sistema (git, curl, build-essential, etc.)
+#   2. Instala Docker e garante que o serviço está rodando
+#   3. Configura o ambiente backend (JDK 21 para Spring Boot)
+#   4. Gera chave SSH e cadastra no GitLab automaticamente
+#   5. Configura Git com nome/email do desenvolvedor
+#   6. Instala VS Code + extensões essenciais
+#
+- name: "Cenário 1 - Provisionamento Padronizado de Ambiente Dev"
+  hosts: dev_machines
+  become: yes
+  vars:
+    # Configurações da empresa
+    company_name: "TechCorp"
+    gitlab_url: "https://gitlab.techcorp.com.br"
+    gitlab_token: "glpat-xxxxxxxxxxxx"  # Token de acesso ao GitLab API
+
+    # Configurações do desenvolvedor
+    dev_user: "{{ ansible_user }}"
+    dev_name: "Desenvolvedor TechCorp"
+    dev_email: "dev@techcorp.com.br"
+
+    # Versões das ferramentas
+    docker_compose_version: "2.24.0"
+    jdk_version: "21"
+
+  tasks:
+    # ================== PASSEIO 1: Dependências do Sistema ==================
+    - name: "1.1 - Atualizar cache do apt"
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: "1.2 - Instalar dependências essenciais"
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg2
+          - lsb-release
+          - software-properties-common
+          - wget
+          - git
+          - unzip
+          - zip
+          - htop
+          - tmux
+          - tree
+          - jq
+          - net-tools
+          - build-essential
+          - python3-pip
+        state: present
+
+    - name: "1.3 - Verificar se as dependências foram instaladas"
+      command: "{{ item }} --version"
+      loop:
+        - git
+        - curl
+        - wget
+      register: dep_check
+      changed_when: false
+      failed_when: dep_check.rc != 0
+
+    # ================== PASSEIO 2: Docker ==================
+    - name: "2.1 - Adicionar chave GPG do Docker"
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: "2.2 - Adicionar repositório do Docker"
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        update_cache: yes
+
+    - name: "2.3 - Instalar Docker Engine"
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: "2.4 - Garantir que o serviço Docker está iniciado e habilitado"
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: "2.5 - Adicionar usuário ao grupo docker"
+      user:
+        name: "{{ dev_user }}"
+        groups: docker
+        append: yes
+
+    - name: "2.6 - Configurar Docker daemon (log rotation)"
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "10m",
+              "max-file": "3"
+            }
+          }
+      notify: restart docker
+
+    - name: "2.7 - Verificar Docker está funcionando"
+      command: docker run --rm hello-world
+      register: docker_test
+      changed_when: false
+
+    # ================== PASSEIO 3: Ambiente Backend (JDK) ==================
+    - name: "3.1 - Instalar OpenJDK {{ jdk_version }}"
+      apt:
+        name: "openjdk-{{ jdk_version }}-jdk"
+        state: present
+
+    - name: "3.2 - Configurar JAVA_HOME"
+      lineinfile:
+        path: "/home/{{ dev_user }}/.bashrc"
+        line: "export JAVA_HOME=/usr/lib/jvm/java-{{ jdk_version }}-openjdk-amd64"
+        create: yes
+
+    - name: "3.3 - Verificar instalação do Java"
+      command: java --version
+      register: java_check
+      changed_when: false
+
+    - name: "3.4 - Instalar Maven (build tool para Spring Boot)"
+      apt:
+        name: maven
+        state: present
+
+    - name: "3.5 - Instalar Gradle"
+      get_url:
+        url: "https://services.gradle.org/distributions/gradle-8.5-bin.zip"
+        dest: "/tmp/gradle-8.5-bin.zip"
+      when: ansible_os_family == "Debian"
+
+    - name: "3.6 - Extrair Gradle"
+      unarchive:
+        src: /tmp/gradle-8.5-bin.zip
+        dest: /opt
+        remote_src: yes
+      when: ansible_os_family == "Debian"
+
+    # ================== PASSEIO 4: Chave SSH + GitLab ==================
+    - name: "4.1 - Criar diretório .ssh"
+      file:
+        path: "/home/{{ dev_user }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ dev_user }}"
+
+    - name: "4.2 - Gerar chave SSH Ed25519"
+      command: "ssh-keygen -t ed25519 -C '{{ dev_email }}' -f /home/{{ dev_user }}/.ssh/id_ed25519 -N ''"
+      args:
+        creates: "/home/{{ dev_user }}/.ssh/id_ed25519"
+
+    - name: "4.3 - Ler chave pública"
+      slurp:
+        src: "/home/{{ dev_user }}/.ssh/id_ed25519.pub"
+      register: ssh_pubkey
+
+    - name: "4.4 - Cadastrar chave SSH no GitLab via API"
+      uri:
+        url: "{{ gitlab_url }}/api/v4/user/keys"
+        method: POST
+        headers:
+          PRIVATE-TOKEN: "{{ gitlab_token }}"
+        body_format: form
+        body:
+          title: "Ansible - {{ ansible_hostname }}"
+          key: "{{ ssh_pubkey.content | b64decode }}"
+        status_code: [200, 201, 422]  # 422 = chave já existe
+      when: gitlab_token != "glpat-xxxxxxxxxxxx"
+
+    - name: "4.5 - Configurar Git"
+      git_config:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        scope: global
+      loop:
+        - { name: "user.name", value: "{{ dev_name }}" }
+        - { name: "user.email", value: "{{ dev_email }}" }
+        - { name: "init.defaultBranch", value: "main" }
+        - { name: "pull.rebase", value: "false" }
+
+    # ================== PASSEIO 5: VS Code ==================
+    - name: "5.1 - Adicionar repositório do VS Code"
+      apt_repository:
+        repo: "deb [arch=amd64] https://packages.microsoft.com/repos/code stable main"
+        state: present
+
+    - name: "5.2 - Instalar VS Code"
+      apt:
+        name: code
+        state: present
+
+    - name: "5.3 - Instalar extensões essenciais"
+      command: "code --install-extension {{ item }} --force"
+      loop:
+        - ms-python.python
+        - vscjava.vscode-java-pack
+        - ms-azuretools.vscode-docker
+        - eamodio.gitlens
+        - redhat.java
+      become: no
+      ignore_errors: yes
+
+    # ================== PASSEIO 6: Verificação Final ==================
+    - name: "6.1 - Criar script de verificação"
+      copy:
+        dest: "/home/{{ dev_user }}/verificar-ambiente.sh"
+        mode: '0755'
+        owner: "{{ dev_user }}"
+        content: |
+          #!/bin/bash
+          echo "=========================================="
+          echo "  Verificação do Ambiente de Desenvolvimento"
+          echo "  {{ company_name }}"
+          echo "=========================================="
+          echo ""
+          echo "1. Git:        $(git --version)"
+          echo "2. Docker:     $(docker --version)"
+          echo "3. Java:       $(java --version 2>&1 | head -1)"
+          echo "4. Maven:      $(mvn --version 2>&1 | head -1)"
+          echo "5. SSH Key:    $(ls ~/.ssh/id_ed25519.pub 2>/dev/null && echo 'Configurada' || echo 'Não encontrada')"
+          echo "6. Git Config: $(git config user.name) <$(git config user.email)>"
+          echo "7. Docker OK:  $(docker run --rm hello-world 2>&1 | head -1)"
+          echo ""
+          echo "=========================================="
+          echo "  Ambiente pronto para desenvolvimento!"
+          echo "=========================================="
+
+    - name: "6.2 - Executar verificação"
+      command: "/home/{{ dev_user }}/verificar-ambiente.sh"
+      register: verificacao
+      changed_when: false
+
+  handlers:
+    - name: restart docker
+      service:
+        name: docker
+        state: restarted

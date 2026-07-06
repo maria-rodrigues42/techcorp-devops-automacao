@@ -1,0 +1,311 @@
+---
+# playbook.yml - Provisionamento remoto de estações de desenvolvimento
+#
+# Uso: ansible-playbook -i inventory playbook.yml --ask-become-pass
+#
+- name: Provisionar estação de desenvolvimento TechCorp
+  hosts: workstations
+  become: yes
+  vars:
+    company: TechCorp
+    gitlab_url: "https://gitlab.techcorp.com.br"
+    node_version: "lts/*"
+    python_version: "3.12"
+    java_version: "21-tem"
+    mysql_databases:
+      - name: techcorp_main
+        user: dev
+        password: dev_password_2024
+      - name: techcorp_staging
+        user: dev_staging
+        password: staging_password_2024
+    redis_password: "redis_password_2024"
+
+  tasks:
+    # ================== Pacotes base ==================
+    - name: Atualizar cache apt
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Instalar pacotes base
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - unzip
+          - zip
+          - software-properties-common
+          - apt-transport-https
+          - ca-certificates
+          - gnupg2
+          - lsb-release
+          - htop
+          - tmux
+          - tree
+          - jq
+          - ripgrep
+          - build-essential
+          - python3-pip
+          - python3-venv
+        state: present
+
+    # ================== Git ==================
+    - name: Configurar Git - core
+      git_config:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        scope: global
+      loop:
+        - { name: "init.defaultBranch", value: "main" }
+        - { name: "core.autocrlf", value: "input" }
+        - { name: "pull.rebase", value: "false" }
+        - { name: "color.ui", value: "auto" }
+        - { name: "user.name", value: "Dev {{ company }}" }
+        - { name: "user.email", value: "dev@{{ company | lower }}.com.br" }
+
+    - name: Gerar chave SSH Ed25519
+      command: ssh-keygen -t ed25519 -C "dev@{{ company | lower }}.com.br" -f "/home/{{ ansible_user }}/.ssh/id_ed25519" -N ""
+      args:
+        creates: "/home/{{ ansible_user }}/.ssh/id_ed25519"
+
+    # ================== Docker ==================
+    - name: Instalar Docker
+      shell: curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Adicionar usuário ao grupo docker
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Configurar Docker daemon
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {"max-size": "10m", "max-file": "3"},
+            "storage-driver": "overlay2",
+            "live-restore": true
+          }
+      notify: restart docker
+
+    - name: Iniciar e habilitar Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Instalar Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    # ================== Portainer ==================
+    - name: Criar volume Portainer
+      command: docker volume create portainer_data
+      args:
+        creates: /var/lib/docker/volumes/portainer_data/_data
+
+    - name: Instalar Portainer
+      community.docker.docker_container:
+        name: portainer
+        image: portainer/portainer-ce:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "9000:9000"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+          - portainer_data:/data
+
+    # ================== VS Code ==================
+    - name: Adicionar chave VS Code
+      apt_key:
+        url: https://packages.microsoft.com/keys/microsoft.asc
+        state: present
+
+    - name: Adicionar repo VS Code
+      apt_repository:
+        repo: "deb [arch=amd64] https://packages.microsoft.com/repos/code stable main"
+        state: present
+
+    - name: Instalar VS Code
+      apt:
+        name: code
+        state: present
+        update_cache: yes
+
+    - name: Instalar extensões VS Code
+      command: "code --install-extension {{ item }} --force"
+      loop:
+        - ms-python.python
+        - ms-python.vscode-pylance
+        - ms-java.java-pack
+        - dbaeumer.vscode-eslint
+        - esbenp.prettier-vscode
+        - ms-azuretools.vscode-docker
+        - eamodio.gitlens
+        - cweijan.vscode-database-client2
+      become: no
+
+    # ================== Node.js ==================
+    - name: Instalar NVM
+      shell: |
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+      args:
+        creates: "/home/{{ ansible_user }}/.nvm/nvm.sh"
+      become: no
+
+    - name: Instalar Node.js LTS
+      shell: |
+        export NVM_DIR="/home/{{ ansible_user }}/.nvm"
+        . "$NVM_DIR/nvm.sh"
+        nvm install --lts
+        nvm alias default lts/*
+      become: no
+
+    # ================== Python ==================
+    - name: Instalar ferramentas Python
+      pip:
+        name:
+          - black
+          - flake8
+          - mypy
+          - pytest
+          - httpie
+        break_system_packages: yes
+
+    # ================== Java ==================
+    - name: Instalar SDKMAN
+      shell: curl -s "https://get.sdkman.io" | bash
+      args:
+        creates: "/home/{{ ansible_user }}/.sdkman/bin/sdkman-init.sh"
+      become: no
+
+    - name: Instalar Java 21
+      shell: |
+        source "/home/{{ ansible_user }}/.sdkman/bin/sdkman-init.sh"
+        sdk install java {{ java_version }}
+        sdk default java {{ java_version }}
+      become: no
+
+    # ================== Helm ==================
+    - name: Instalar Helm
+      shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    # ================== kubectl ==================
+    - name: Instalar kubectl
+      get_url:
+        url: "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    # ================== Terraform ==================
+    - name: Adicionar chave HashiCorp
+      apt_key:
+        url: https://apt.releases.hashicorp.com/gpg
+        state: present
+
+    - name: Adicionar repo HashiCorp
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+        state: present
+
+    - name: Instalar Terraform
+      apt:
+        name: terraform
+        state: present
+        update_cache: yes
+
+    # ================== Ansible ==================
+    - name: Instalar Ansible
+      apt:
+        name:
+          - ansible
+          - ansible-lint
+        state: present
+
+    # ================== Banco de Dados (Docker) ==================
+    - name: Criar diretório de trabalho
+      file:
+        path: "/home/{{ ansible_user }}/techcorp-databases"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Criar Docker Compose para bancos
+      copy:
+        dest: "/home/{{ ansible_user }}/techcorp-databases/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        content: |
+          version: "3.9"
+          services:
+            mysql:
+              image: mysql:8.0
+              container_name: techcorp-mysql
+              restart: always
+              environment:
+                MYSQL_ROOT_PASSWORD: techcorp_root_2024
+                MYSQL_DATABASE: techcorp_main
+                MYSQL_USER: dev
+                MYSQL_PASSWORD: dev_password_2024
+              ports:
+                - "3306:3306"
+              volumes:
+                - mysql_data:/var/lib/mysql
+
+            mariadb:
+              image: mariadb:11
+              container_name: techcorp-mariadb
+              restart: always
+              environment:
+                MYSQL_ROOT_PASSWORD: techcorp_root_2024
+                MYSQL_DATABASE: techcorp_legacy
+                MYSQL_USER: dev_legacy
+                MYSQL_PASSWORD: dev_password_2024
+              ports:
+                - "3307:3306"
+              volumes:
+                - mariadb_data:/var/lib/mysql
+
+            redis:
+              image: redis:7-alpine
+              container_name: techcorp-redis
+              restart: always
+              command: redis-server --requirepass redis_password_2024
+              ports:
+                - "6379:6379"
+              volumes:
+                - redis_data:/data
+
+            adminer:
+              image: adminer:latest
+              container_name: techcorp-adminer
+              restart: always
+              ports:
+                - "8080:8080"
+
+          volumes:
+            mysql_data:
+            mariadb_data:
+            redis_data:
+
+    - name: Subir containers de banco
+      command: docker compose up -d
+      args:
+        chdir: "/home/{{ ansible_user }}/techcorp-databases"
+
+  handlers:
+    - name: restart docker
+      service:
+        name: docker
+        state: restarted

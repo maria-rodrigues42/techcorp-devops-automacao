@@ -1,0 +1,9 @@
+[workstations]
+# Adicione os IPs/hostnames das máquinas dos desenvolvedores
+# workstation-01 ansible_host=192.168.1.100
+# workstation-02 ansible_host=192.168.1.101
+localhost ansible_connection=local
+
+[all:vars]
+ansible_user=sysadmin
+ansible_python_interpreter=/usr/bin/python3

@@ -1,0 +1,12 @@
+# Variáveis globais do grupo
+company_name: "TechCorp"
+domain: "techcorp.com.br"
+
+# GitLab
+gitlab_url: "https://gitlab.techcorp.com.br"
+
+# Rede
+lan_prefix: "192.168.13"
+
+# Usuário padrão
+default_user: "sysadmin"
