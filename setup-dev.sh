@@ -7,7 +7,7 @@
 # O que este script faz:
 #   1. Instala dependências de sistema
 #   2. Instala Docker
-#   3. Instala JDK 21 (para Spring Boot)
+#   3. Instala JDK 17 (para Spring Boot)
 #   4. Configura Git
 #   5. Gera chave SSH
 #   6. Instala VS Code
@@ -26,6 +26,54 @@ log()   { echo -e "${BLUE}[INFO]${NC} $*"; }
 ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[AVISO]${NC} $*"; }
 err()   { echo -e "${RED}[ERRO]${NC} $*" >&2; }
+die()   { err "$*"; exit 1; }
+
+# ================== Instalação robusta do Docker ==================
+# Instala via repositório oficial (determinístico), com fallback, sem
+# suprimir a saída, e VERIFICA ao final (falha alto se não instalar).
+install_docker() {
+  if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker; then
+    ok "Docker já instalado: $(docker --version)"
+    return 0
+  fi
+
+  export DEBIAN_FRONTEND=noninteractive
+  log "  Preparando repositório oficial do Docker..."
+  apt-get update -y
+  apt-get install -y ca-certificates curl gnupg lsb-release
+
+  install -m 0755 -d /etc/apt/keyrings
+  . /etc/os-release
+  local distro="${ID:-debian}"
+  local codename="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null)}"
+
+  if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+    curl -fsSL "https://download.docker.com/linux/${distro}/gpg" \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  fi
+
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${codename} stable" \
+    > /etc/apt/sources.list.d/docker.list
+  apt-get update -y
+
+  if ! apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
+    warn "  Repositório oficial falhou; tentando pacote docker.io da distro..."
+    if ! apt-get install -y docker.io; then
+      warn "  Tentando script get.docker.com como último recurso..."
+      curl -fsSL https://get.docker.com | sh
+    fi
+  fi
+
+  systemctl enable --now docker
+  usermod -aG docker "$DEV_USER" 2>/dev/null || true
+
+  if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker; then
+    ok "Docker instalado: $(docker --version)"
+  else
+    die "Falha ao instalar o Docker. Rode 'sudo dpkg --configure -a && sudo apt-get install -f' e execute o script novamente."
+  fi
+}
 
 # ================== Verificar root ==================
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -59,21 +107,14 @@ ok "Dependências instaladas"
 
 # ================== 2. Docker ==================
 log "2/6 - Instalando Docker..."
-if ! command -v docker >/dev/null 2>&1; then
-  curl -fsSL https://get.docker.com | sh >/dev/null 2>&1
-  systemctl enable --now docker
-  usermod -aG docker "$DEV_USER"
-  ok "Docker instalado"
-else
-  ok "Docker já instalado"
-fi
+install_docker
 
-# ================== 3. Java (JDK 21) ==================
-log "3/6 - Instalando JDK 21..."
+# ================== 3. Java (JDK 17) ==================
+log "3/6 - Instalando JDK 17..."
 if ! java --version >/dev/null 2>&1; then
-  apt-get install -y openjdk-21-jdk >/dev/null 2>&1
-  echo "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64" >> "/home/$DEV_USER/.bashrc"
-  ok "JDK 21 instalado"
+  apt-get install -y openjdk-17-jdk >/dev/null 2>&1
+  echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> "/home/$DEV_USER/.bashrc"
+  ok "JDK 17 instalado"
 else
   ok "Java já instalado: $(java --version 2>&1 | head -1)"
 fi

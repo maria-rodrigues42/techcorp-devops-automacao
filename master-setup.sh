@@ -42,13 +42,11 @@ echo
 log "Verificando máquinas virtuais..."
 VM_LIST=$(VBoxManage list runningvms 2>/dev/null | awk -F'"' '{print $2}')
 
-for VM in gateway operacao dev01 dev02; do
+for VM in gateway dns dbserver gitlab operacao webserver dev01 dev02; do
   if echo "$VM_LIST" | grep -q "^${VM}$"; then
     ok "VM ${VM} está rodando"
   else
-    err "VM ${VM} NÃO está rodando!"
-    echo "  Ligue a VM antes de continuar."
-    exit 1
+    warn "VM ${VM} não está rodando (será pulada)"
   fi
 done
 
@@ -89,7 +87,11 @@ run_in_vm() {
   local vm_ip=""
   case "$vm_name" in
     gateway)     vm_ip="192.168.13.101" ;;
+    dns)         vm_ip="192.168.13.53"  ;;
+    dbserver)    vm_ip="192.168.13.130" ;;
+    gitlab)      vm_ip="192.168.13.100" ;;
     operacao)    vm_ip="192.168.13.151" ;;
+    webserver)   vm_ip="192.168.13.140" ;;
     dev01)       vm_ip="192.168.13.201" ;;
     dev02)       vm_ip="192.168.13.202" ;;
   esac
@@ -134,10 +136,14 @@ log "Testando conectividade com as VMs..."
 echo
 
 CONNECTED=0
-for VM in gateway operacao dev01 dev02; do
+for VM in gateway dns dbserver gitlab operacao webserver dev01 dev02; do
   case "$VM" in
     gateway)   IP="192.168.13.101" ;;
+    dns)       IP="192.168.13.53"  ;;
+    dbserver)  IP="192.168.13.130" ;;
+    gitlab)    IP="192.168.13.100" ;;
     operacao)  IP="192.168.13.151" ;;
+    webserver) IP="192.168.13.140" ;;
     dev01)     IP="192.168.13.201" ;;
     dev02)     IP="192.168.13.202" ;;
   esac
@@ -171,13 +177,49 @@ echo
 log "Iniciando configuração das VMs..."
 echo
 
-# Ordem: Gateway → Operação → Dev01 → Dev02
+# Ordem: Gateway → DNS → DB Server → GitLab → Webserver → Operação → Dev01 → Dev02
 
 # 1. Gateway
 if ping -c1 -W2 192.168.13.101 >/dev/null 2>&1; then
   setup_vm "gateway" "setup-gateway.sh" "192.168.13.101"
 else
   warn "Pulando Gateway (offline)"
+fi
+
+echo
+
+# DNS
+if ping -c1 -W2 192.168.13.53 >/dev/null 2>&1; then
+  setup_vm "dns" "setup-dns.sh" "192.168.13.53"
+else
+  warn "Pulando DNS (offline)"
+fi
+
+echo
+
+# DB Server
+if ping -c1 -W2 192.168.13.130 >/dev/null 2>&1; then
+  setup_vm "dbserver" "setup-dbserver.sh" "192.168.13.130"
+else
+  warn "Pulando DB Server (offline)"
+fi
+
+echo
+
+# GitLab
+if ping -c1 -W2 192.168.13.100 >/dev/null 2>&1; then
+  setup_vm "gitlab" "setup-gitlab.sh" "192.168.13.100"
+else
+  warn "Pulando GitLab (offline)"
+fi
+
+echo
+
+# Webserver
+if ping -c1 -W2 192.168.13.140 >/dev/null 2>&1; then
+  setup_vm "webserver" "setup-webserver.sh" "192.168.13.140"
+else
+  warn "Pulando Webserver (offline)"
 fi
 
 echo

@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 #
-# setup-operacao.sh - Configuração completa da máquina de OPERAÇÃO
+# setup-gitlab.sh - Configuração completa da máquina GITLAB
 #
-# IP: 192.168.13.151
-# Função: Control node Ansible (provisiona e faz deploy de tudo)
+# IP: 192.168.13.100
+# Função: Servidor GitLab CE (código, CI, registry)
 #
-# Uso: sudo ./setup-operacao.sh
+# Uso: sudo ./setup-gitlab.sh
+#
+# ATENÇÃO: o GitLab é pesado. Reserve pelo menos 4 GB de RAM para esta VM.
+#          O primeiro boot leva alguns minutos até ficar acessível.
 #
 set -uo pipefail
 
 # ================== Configurações Fixas ==================
-IP="192.168.13.151"
+IP="192.168.13.100"
 NETMASK="255.255.255.0"
 GW_IP="192.168.13.101"
 OP_IP="192.168.13.151"
@@ -88,14 +91,14 @@ install_docker() {
 
 # ================== Verificar root ==================
 if [[ "$(id -u)" -ne 0 ]]; then
-  die "Execute como root: sudo ./setup-operacao.sh"
+  die "Execute como root: sudo ./setup-gitlab.sh"
 fi
 
 echo
 echo "=========================================="
-echo "  TechCorp - Setup OPERAÇÃO"
+echo "  TechCorp - Setup GITLAB"
 echo "  IP: $IP"
-echo "  Função: Control Node Ansible"
+echo "  Função: GitLab CE (Docker)"
 echo "=========================================="
 echo
 
@@ -105,7 +108,7 @@ log "1/8 - Configurando rede..."
 LAN_IFACE=$(ip -4 addr show | grep -oP 'en\w+|eth\w+' | head -1)
 
 cat > /etc/network/interfaces << EOF
-# TechCorp Operacao - Configuração de Rede
+# TechCorp GitLab - Configuração de Rede
 source /etc/network/interfaces.d/*
 
 auto lo
@@ -123,20 +126,20 @@ ok "Rede configurada"
 
 # ================== 2. Hostname ==================
 log "2/8 - Configurando hostname..."
-echo "operacao" > /etc/hostname
-hostnamectl set-hostname operacao 2>/dev/null || hostname operacao
+echo "gitlab" > /etc/hostname
+hostnamectl set-hostname gitlab 2>/dev/null || hostname gitlab
 
 # ================== 3. /etc/hosts ==================
 log "3/8 - Configurando /etc/hosts..."
 cat > /etc/hosts << EOF
 127.0.0.1   localhost
-${IP}       operacao.${DOMAIN}  operacao
-${GW_IP}    gateway.${DOMAIN}   gateway
-${DEV01_IP} dev01.${DOMAIN}     dev01
-${DEV02_IP} dev02.${DOMAIN}     dev02
+${GITLAB_IP} gitlab.${DOMAIN}     gitlab
+${GW_IP}    gateway.${DOMAIN}     gateway
+${OP_IP}    operacao.${DOMAIN}    operacao
+${DEV01_IP} dev01.${DOMAIN}       dev01
+${DEV02_IP} dev02.${DOMAIN}       dev02
 ${HOMOLOGACAO_IP} homologacao.${DOMAIN} homologacao
 ${DNS_IP}   dns.${DOMAIN}         dns
-${GITLAB_IP} gitlab.${DOMAIN}     gitlab
 ${WEBSERVER_IP} webserver.${DOMAIN} webserver
 ${DBSERVER_IP} dbserver.${DOMAIN} dbserver
 EOF
@@ -163,73 +166,64 @@ ok "Usuário ${ADMIN} criado"
 
 # ================== 6. SSH ==================
 log "6/8 - Configurando SSH..."
-apt-get update -y >/dev/null 2>&1
-apt-get install -y openssh-server curl git >/dev/null 2>&1
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y openssh-server
 systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null
 
 SSH_DIR="/home/${ADMIN}/.ssh"
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
-
-# Gerar chave se não existir
 if [[ ! -f "$SSH_DIR/id_rsa" ]]; then
-  ssh-keygen -t rsa -b 4096 -C "operacao@techcorp.com.br" -f "$SSH_DIR/id_rsa" -N ""
+  ssh-keygen -t rsa -b 4096 -C "gitlab@techcorp.com.br" -f "$SSH_DIR/id_rsa" -N ""
 fi
-
-# Copiar chave para as outras máquinas (quando elas estiverem no ar)
-for HOST in "$DEV01_IP" "$DEV02_IP" "$HOMOLOGACAO_IP" "$DNS_IP" "$GITLAB_IP" "$WEBSERVER_IP" "$DBSERVER_IP"; do
-  log "  Copiando chave para ${HOST}..."
-  ssh-copy-id -o StrictHostKeyChecking=no -o ConnectTimeout=5 "${ADMIN}@${HOST}" 2>/dev/null && \
-    ok "  Chave copiada para ${HOST}" || \
-    warn "  Não foi possível copiar chave para ${HOST} (máquina pode não estar no ar)"
-done
-
+chown -R "${ADMIN}:${ADMIN}" "$SSH_DIR"
 ok "SSH configurado"
 
 # ================== 7. Docker ==================
 log "7/8 - Instalando Docker..."
 install_docker
 
-# ================== 8. Ansible ==================
-log "8/8 - Instalando Ansible..."
-if ! command -v ansible >/dev/null 2>&1; then
-  apt-get install -y ansible >/dev/null 2>&1
-fi
+# ================== 8. GitLab CE ==================
+log "8/8 - Subindo GitLab CE (Docker)..."
+# Observação: o GitLab usa a porta 22 do container mapeada em 2222 no host,
+# para não conflitar com o SSH do próprio servidor (porta 22).
+GITLAB_DIR="/srv/gitlab"
+mkdir -p "$GITLAB_DIR"
 
-# Criar inventário
-mkdir -p "/home/${ADMIN}/ansible"
-cat > "/home/${ADMIN}/ansible/inventory" << EOF
-[dev_machines]
-dev01 ansible_host=${DEV01_IP} ansible_user=${ADMIN}
-dev02 ansible_host=${DEV02_IP} ansible_user=${ADMIN}
+cat > "$GITLAB_DIR/docker-compose.yml" << 'YAML'
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab
+    restart: always
+    hostname: gitlab.techcorp.com.br
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.techcorp.com.br'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        # Perfil enxuto para caber numa VM de laboratório:
+        puma['worker_processes'] = 2
+        prometheus_monitoring['enable'] = false
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2222:22"
+    volumes:
+      - /srv/gitlab/config:/etc/gitlab
+      - /srv/gitlab/logs:/var/log/gitlab
+      - /srv/gitlab/data:/var/opt/gitlab
+    shm_size: '256m'
+YAML
 
-[homologacao]
-homologacao ansible_host=${HOMOLOGACAO_IP} ansible_user=${ADMIN}
-
-[dns_servers]
-dns ansible_host=${DNS_IP} ansible_user=${ADMIN}
-
-[gitlab_servers]
-gitlab ansible_host=${GITLAB_IP} ansible_user=${ADMIN}
-
-[web_servers]
-webserver ansible_host=${WEBSERVER_IP} ansible_user=${ADMIN}
-
-[db_servers]
-dbserver ansible_host=${DBSERVER_IP} ansible_user=${ADMIN}
-
-[all:vars]
-ansible_python_interpreter=/usr/bin/python3
-ansible_ssh_private_key_file=/home/${ADMIN}/.ssh/id_rsa
-EOF
-
-chown -R "${ADMIN}:${ADMIN}" "/home/${ADMIN}/ansible"
-ok "Ansible instalado"
+cd "$GITLAB_DIR"
+docker compose up -d || die "Falha ao subir o GitLab via docker compose"
+ok "GitLab iniciado (o primeiro boot leva alguns minutos)"
 
 # ================== Verificação ==================
 echo
 echo "=========================================="
-echo "  OPERAÇÃO CONFIGURADA!"
+echo "  GITLAB CONFIGURADO!"
 echo "=========================================="
 echo
 echo "Rede:"
@@ -239,16 +233,17 @@ echo
 echo "Serviços:"
 echo "  SSH: $(systemctl is-active ssh 2>/dev/null || systemctl is-active sshd 2>/dev/null)"
 echo "  Docker: $(systemctl is-active docker)"
-echo "  Ansible: $(ansible --version 2>/dev/null | head -1)"
+echo "  Container GitLab: $(docker ps --filter name=gitlab --format '{{.Status}}' 2>/dev/null || echo 'iniciando')"
 echo
-echo "Máquinas no /etc/hosts:"
-grep -E "dev0|operacao|gateway|homologacao" /etc/hosts | awk '{print "  " $1 " → " $2}'
+echo "Acesso (aguarde alguns minutos no primeiro boot):"
+echo "  Web:   http://${IP}   (ou http://gitlab.${DOMAIN} se o DNS estiver ativo)"
+echo "  SSH Git: porta 2222"
 echo
-echo "Inventário Ansible: /home/${ADMIN}/ansible/inventory"
+echo "Senha inicial do usuário 'root' (válida por 24h após o primeiro boot):"
+echo "  sudo docker exec gitlab cat /etc/gitlab/initial_root_password"
 echo
 echo "Próximos passos:"
-echo "  1. Execute setup-dev01.sh na máquina Dev01"
-echo "  2. Execute setup-dev02.sh na máquina Dev02"
-echo "  3. Execute setup-homologacao.sh na máquina de Homologação"
-echo "  4. Depois, volte aqui e rode os playbooks Ansible"
+echo "  1. Aguarde o container ficar 'healthy': docker ps"
+echo "  2. Acesse a web e troque a senha do root"
+echo "  3. Cadastre as chaves SSH das VMs dev01/dev02"
 echo

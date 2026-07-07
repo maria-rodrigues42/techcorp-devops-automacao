@@ -11,7 +11,7 @@
     gitlab_url: "https://gitlab.techcorp.com.br"
     node_version: "lts/*"
     python_version: "3.12"
-    java_version: "21-tem"
+    java_version: "17-tem"
     mysql_databases:
       - name: techcorp_main
         user: dev
@@ -188,7 +188,7 @@
         creates: "/home/{{ ansible_user }}/.sdkman/bin/sdkman-init.sh"
       become: no
 
-    - name: Instalar Java 21
+    - name: Instalar Java 17
       shell: |
         source "/home/{{ ansible_user }}/.sdkman/bin/sdkman-init.sh"
         sdk install java {{ java_version }}

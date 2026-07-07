@@ -13,11 +13,28 @@ warn() { echo -e "  \033[1;33m⚠\033[0m $*"; }
 
 apt_update()  { apt-get update -y >/dev/null 2>&1 || true; }
 apt_install() { DEBIAN_FRONTEND=noninteractive apt-get install -y "$@" >/dev/null 2>&1; }
+command_exists(){ command -v "$1" >/dev/null 2>&1; }
 
 # ================== Docker ==================
 log "Instalando Docker..."
-if ! command_exists docker; then
-  curl -fsSL https://get.docker.com | sh
+if ! command_exists docker || ! systemctl is-active --quiet docker; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt_update
+  apt-get install -y ca-certificates curl gnupg lsb-release
+  install -m 0755 -d /etc/apt/keyrings
+  . /etc/os-release
+  DISTRO="${ID:-debian}"
+  CODENAME="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null)}"
+  if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+    curl -fsSL "https://download.docker.com/linux/${DISTRO}/gpg" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  fi
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${DISTRO} ${CODENAME} stable" \
+    > /etc/apt/sources.list.d/docker.list
+  apt_update
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+    || apt-get install -y docker.io \
+    || curl -fsSL https://get.docker.com | sh
   systemctl enable --now docker
   # Adicionar usuário ao grupo docker
   usermod -aG docker "${SUDO_USER:-$USER}" 2>/dev/null || true

@@ -8,5 +8,16 @@ gitlab_url: "https://gitlab.techcorp.com.br"
 # Rede
 lan_prefix: "192.168.13"
 
+# IPs das máquinas
+ip_gateway: "192.168.13.101"
+ip_operacao: "192.168.13.151"
+ip_homologacao: "192.168.13.150"
+ip_dev01: "192.168.13.201"
+ip_dev02: "192.168.13.202"
+ip_dns: "192.168.13.53"
+ip_gitlab: "192.168.13.100"
+ip_webserver: "192.168.13.140"
+ip_dbserver: "192.168.13.130"
+
 # Usuário padrão
 default_user: "sysadmin"

@@ -16,15 +16,19 @@ Imagina que você trabalha numa empresa de TI chamada **TechCorp**. Essa empresa
 
 ## AS MÁQUINAS
 
-A empresa tem 5 máquinas virtuais:
+A empresa tem 9 máquinas virtuais:
 
 | Máquina | IP | O que ela faz |
 |---------|-----|---------------|
 | **Gateway** | 192.168.13.101 | É o "roteador" - dá internet para todas as outras e distribui o trabalho |
+| **DNS** | 192.168.13.53 | Traduz nomes (ex.: homologacao.techcorp.com.br) em IPs |
+| **GitLab** | 192.168.13.100 | Guarda o código e roda o CI (via Docker) |
 | **Operação** | 192.168.13.151 | É o "chefe" - controla e configura todas as outras remotamente |
-| **Dev01** | 192.168.13.201 | Máquina do programador 1 |
-| **Dev02** | 192.168.13.202 | Máquina do programador 2 |
-| **Homologação** | 192.168.13.150 | Onde testamos o programa antes de entregar pro cliente |
+| **Webserver** | 192.168.13.140 | Servidor web dedicado (nginx) |
+| **DB Server** | 192.168.13.130 | Servidor de banco de dados (MariaDB) |
+| **Homologação** | 192.168.13.150 | Onde testamos o programa completo antes de entregar (tudo-em-um) |
+| **Dev01** | 192.168.13.201 | Máquina do programador backend (Java 17) |
+| **Dev02** | 192.168.13.202 | Máquina do programador frontend (Node.js) |
 
 ---
 
@@ -41,19 +45,41 @@ A empresa tem 5 máquinas virtuais:
 - Instala o Docker
 - Copia a chave SSH para as outras máquinas (para poder acessar sem senha)
 
-### setup-dev01.sh e setup-dev02.sh (Desenvolvimento)
+### setup-dev01.sh (Desenvolvimento Backend)
 - Configura a rede
 - Instala Docker (para rodar programas em caixas isoladas)
-- Instala JDK 21 (para programar em Java/Spring Boot)
-- Instala Git (para controlar versões do código)
-- Instala VS Code (editor de código)
+- Instala JDK 17 (para programar em Java/Spring Boot)
+- Instala Git e VS Code
 - Gera chave SSH (para se conectar na operação)
+
+### setup-dev02.sh (Desenvolvimento Frontend)
+- Configura a rede
+- Instala Docker
+- Instala Node.js LTS + npm/Yarn/pnpm e CLIs de frontend (Vite, Angular, Vue)
+- Instala Git e VS Code (com extensões de frontend)
+- Gera chave SSH
 
 ### setup-homologacao.sh (Homologação)
 - Configura a rede
 - Instala Docker
 - Cria a aplicação completa (Backend + Frontend + Banco de Dados)
 - Sobe os containers (caixas com os programas rodando)
+
+### setup-dns.sh (DNS)
+- Configura a rede
+- Instala o bind9 e cria a zona techcorp.com.br (traduz nomes em IPs)
+
+### setup-gitlab.sh (GitLab)
+- Configura a rede
+- Instala Docker e sobe o GitLab CE (código + CI). Leva alguns minutos no 1º boot
+
+### setup-webserver.sh (Webserver)
+- Configura a rede
+- Instala o nginx e sobe uma página web dedicada
+
+### setup-dbserver.sh (DB Server)
+- Configura a rede
+- Instala o MariaDB, cria o banco techcorp_homologacao e libera acesso pela rede
 
 ### verificar-tudo.sh
 - Testa se todas as máquinas estão respondendo (ping)
@@ -67,7 +93,7 @@ A empresa tem 5 máquinas virtuais:
 ### PASSO 1: Preparar as máquinas
 
 1. **Abra o VirtualBox** no seu computador
-2. **Ligue as 5 máquinas virtuais** (gateway, operacao, dev01, dev02, homologacao)
+2. **Ligue as máquinas virtuais** (gateway, dns, gitlab, operacao, webserver, dbserver, homologacao, dev01, dev02)
 3. **Espere todas iniciarem** (aparecer o login)
 
 ### PASSO 2: Copiar os scripts para dentro das máquinas
@@ -86,7 +112,7 @@ sudo mount -t vboxsf devops-workstation /mnt
 cp -r /mnt/* ~/
 ```
 
-**Repetir para cada máquina:** gateway, operacao, dev01, dev02, homologacao
+**Repetir para cada máquina:** gateway, dns, gitlab, operacao, webserver, dbserver, homologacao, dev01, dev02
 
 ### PASSO 3: Rodar os scripts NA ORDEM
 
@@ -100,6 +126,21 @@ sudo ./setup-gateway.sh
 ```
 
 Espere terminar. Vai aparecer "GATEWAY CONFIGURADO!" quando acabar.
+
+#### 3.1b - DNS, DB Server, GitLab e Webserver (depois do Gateway)
+```bash
+# Na máquina DNS
+sudo ./setup-dns.sh
+
+# Na máquina DB Server
+sudo ./setup-dbserver.sh
+
+# Na máquina GitLab (leva alguns minutos no 1º boot)
+sudo ./setup-gitlab.sh
+
+# Na máquina Webserver
+sudo ./setup-webserver.sh
+```
 
 #### 3.2 - Operação SEGUNDO
 ```bash
@@ -306,10 +347,15 @@ git config --list
 ```
 devops-workstation/
 ├── setup-gateway.sh        # Executar no Gateway
+├── setup-dns.sh            # Executar no DNS
+├── setup-gitlab.sh         # Executar no GitLab
 ├── setup-operacao.sh       # Executar na Operação
-├── setup-dev01.sh          # Executar no Dev01
-├── setup-dev02.sh          # Executar no Dev02
+├── setup-webserver.sh      # Executar no Webserver
+├── setup-dbserver.sh       # Executar no DB Server
 ├── setup-homologacao.sh    # Executar na Homologação
+├── setup-dev01.sh          # Executar no Dev01 (backend)
+├── setup-dev02.sh          # Executar no Dev02 (frontend)
+├── master-setup.sh         # Configura todas as VMs de uma vez
 ├── verificar-tudo.sh       # Verificar tudo
 ├── atualizar-app.sh        # Fazer deploy (só na Homologação)
 └── README.md               # Este guia
@@ -320,7 +366,7 @@ devops-workstation/
 ## RESUMO RÁPIDO
 
 1. **Copie** a pasta `devops-workstation` para dentro de cada máquina
-2. **Execute** os scripts na ordem: gateway → operacao → dev01 → dev02 → homologacao
+2. **Execute** os scripts na ordem: gateway → dns → dbserver → gitlab → webserver → operacao → dev01 → dev02 → homologacao
 3. **Verifique** com `verificar-tudo.sh`
 4. **Teste** a aplicação em `http://192.168.13.150`
 5. **Simule deploy** com `./atualizar-app.sh v2.0.0`

@@ -17,6 +17,10 @@ OP_IP="192.168.13.151"
 DEV01_IP="192.168.13.201"
 DEV02_IP="192.168.13.202"
 HOMOLOGACAO_IP="192.168.13.150"
+DNS_IP="192.168.13.53"
+GITLAB_IP="192.168.13.100"
+WEBSERVER_IP="192.168.13.140"
+DBSERVER_IP="192.168.13.130"
 DOMAIN="techcorp.com.br"
 ADMIN="sysadmin"
 DNS1="8.8.8.8"
@@ -34,6 +38,53 @@ ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[AVISO]${NC} $*"; }
 err()   { echo -e "${RED}[ERRO]${NC} $*" >&2; }
 die()   { err "$*"; exit 1; }
+
+# ================== Instalação robusta do Docker ==================
+# Instala via repositório oficial (determinístico), com fallback, sem
+# suprimir a saída, e VERIFICA ao final (falha alto se não instalar).
+install_docker() {
+  if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker; then
+    ok "Docker já instalado: $(docker --version)"
+    return 0
+  fi
+
+  export DEBIAN_FRONTEND=noninteractive
+  log "  Preparando repositório oficial do Docker..."
+  apt-get update -y
+  apt-get install -y ca-certificates curl gnupg lsb-release
+
+  install -m 0755 -d /etc/apt/keyrings
+  . /etc/os-release
+  local distro="${ID:-debian}"
+  local codename="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null)}"
+
+  if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+    curl -fsSL "https://download.docker.com/linux/${distro}/gpg" \
+      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  fi
+
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${codename} stable" \
+    > /etc/apt/sources.list.d/docker.list
+  apt-get update -y
+
+  if ! apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
+    warn "  Repositório oficial falhou; tentando pacote docker.io da distro..."
+    if ! apt-get install -y docker.io; then
+      warn "  Tentando script get.docker.com como último recurso..."
+      curl -fsSL https://get.docker.com | sh
+    fi
+  fi
+
+  systemctl enable --now docker
+  usermod -aG docker "$ADMIN" 2>/dev/null || true
+
+  if command -v docker >/dev/null 2>&1 && systemctl is-active --quiet docker; then
+    ok "Docker instalado: $(docker --version)"
+  else
+    die "Falha ao instalar o Docker. Rode 'sudo dpkg --configure -a && sudo apt-get install -f' e execute o script novamente."
+  fi
+}
 
 # ================== Verificar root ==================
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -84,6 +135,10 @@ ${GW_IP}    gateway.${DOMAIN}   gateway
 ${OP_IP}    operacao.${DOMAIN}  operacao
 ${DEV02_IP} dev02.${DOMAIN}     dev02
 ${HOMOLOGACAO_IP} homologacao.${DOMAIN} homologacao
+${DNS_IP}   dns.${DOMAIN}         dns
+${GITLAB_IP} gitlab.${DOMAIN}     gitlab
+${WEBSERVER_IP} webserver.${DOMAIN} webserver
+${DBSERVER_IP} dbserver.${DOMAIN} dbserver
 EOF
 
 ok "/etc/hosts configurado"
@@ -126,20 +181,15 @@ ok "SSH configurado"
 
 # ================== 7. Docker ==================
 log "7/9 - Instalando Docker..."
-if ! command -v docker >/dev/null 2>&1; then
-  curl -fsSL https://get.docker.com | sh >/dev/null 2>&1
-  systemctl enable --now docker
-  usermod -aG docker "$ADMIN"
-fi
-ok "Docker instalado"
+install_docker
 
-# ================== 8. Java (JDK 21) ==================
-log "8/9 - Instalando JDK 21..."
+# ================== 8. Java (JDK 17) ==================
+log "8/9 - Instalando JDK 17..."
 if ! java --version >/dev/null 2>&1; then
-  apt-get install -y openjdk-21-jdk >/dev/null 2>&1
-  echo "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64" >> "/home/${ADMIN}/.bashrc"
+  apt-get install -y openjdk-17-jdk >/dev/null 2>&1
+  echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> "/home/${ADMIN}/.bashrc"
 fi
-ok "JDK 21 instalado"
+ok "JDK 17 instalado"
 
 # ================== 9. Git + VS Code ==================
 log "9/9 - Instalando Git e VS Code..."

@@ -21,7 +21,11 @@ echo
 # ================== Máquinas ==================
 declare -A MAQUINAS=(
   ["gateway"]="192.168.13.101"
+  ["dns"]="192.168.13.53"
+  ["dbserver"]="192.168.13.130"
+  ["gitlab"]="192.168.13.100"
   ["operacao"]="192.168.13.151"
+  ["webserver"]="192.168.13.140"
   ["dev01"]="192.168.13.201"
   ["dev02"]="192.168.13.202"
   ["homologacao"]="192.168.13.150"
@@ -34,7 +38,7 @@ echo
 TOTAL=0
 OK=0
 
-for nome in gateway operacao dev01 dev02 homologacao; do
+for nome in gateway dns dbserver gitlab operacao webserver dev01 dev02 homologacao; do
   ip="${MAQUINAS[$nome]}"
   TOTAL=$((TOTAL + 1))
   if ping -c1 -W2 "$ip" >/dev/null 2>&1; then
@@ -51,7 +55,7 @@ echo
 echo -e "${BLUE}2. Teste SSH (de esta máquina)${NC}"
 echo
 
-for nome in gateway operacao dev01 dev02 homologacao; do
+for nome in gateway dns dbserver gitlab operacao webserver dev01 dev02 homologacao; do
   ip="${MAQUINAS[$nome]}"
   if ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=3 \
     "sysadmin@${ip}" hostname >/dev/null 2>&1; then
@@ -118,6 +122,13 @@ else
   echo -e "  ${RED}✗${NC} Frontend não respondeu"
 fi
 
+WEB=$(curl -s --connect-timeout 3 "http://192.168.13.140" 2>/dev/null)
+if echo "$WEB" | grep -q "TechCorp"; then
+  echo -e "  ${GREEN}✓${NC} Webserver (nginx) acessível"
+else
+  echo -e "  ${RED}✗${NC} Webserver não respondeu"
+fi
+
 echo
 
 # ================== Resumo ==================
@@ -131,7 +142,7 @@ echo "  Mapa da rede:"
 echo "  ┌──────────────┬───────────────────┬────────────────┐"
 echo "  │ Máquina      │ IP                │ Status         │"
 echo "  ├──────────────┼───────────────────┼────────────────┤"
-for nome in gateway operacao dev01 dev02 homologacao; do
+for nome in gateway dns dbserver gitlab operacao webserver dev01 dev02 homologacao; do
   ip="${MAQUINAS[$nome]}"
   if ping -c1 -W2 "$ip" >/dev/null 2>&1; then
     STATUS="${GREEN}Online${NC}"

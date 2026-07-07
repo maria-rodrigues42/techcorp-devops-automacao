@@ -17,6 +17,10 @@ OP_IP="192.168.13.151"
 DEV01_IP="192.168.13.201"
 DEV02_IP="192.168.13.202"
 HOMOLOGACAO_IP="192.168.13.150"
+DNS_IP="192.168.13.53"
+GITLAB_IP="192.168.13.100"
+WEBSERVER_IP="192.168.13.140"
+DBSERVER_IP="192.168.13.130"
 DOMAIN="techcorp.com.br"
 ADMIN="sysadmin"
 DNS1="8.8.8.8"
@@ -96,6 +100,10 @@ ${OP_IP}    operacao.${DOMAIN}  operacao
 ${DEV01_IP} dev01.${DOMAIN}     dev01
 ${DEV02_IP} dev02.${DOMAIN}     dev02
 ${HOMOLOGACAO_IP} homologacao.${DOMAIN} homologacao
+${DNS_IP}   dns.${DOMAIN}         dns
+${GITLAB_IP} gitlab.${DOMAIN}     gitlab
+${WEBSERVER_IP} webserver.${DOMAIN} webserver
+${DBSERVER_IP} dbserver.${DOMAIN} dbserver
 EOF
 
 ok "/etc/hosts configurado"
@@ -184,8 +192,8 @@ apt-get install -y nginx >/dev/null 2>&1
 
 cat > /etc/nginx/sites-available/techcorp-lb << 'NGINX'
 upstream backends {
-    server 192.168.13.201:80;
-    server 192.168.13.202:80;
+    # Servidor web dedicado (webserver.techcorp.com.br)
+    server 192.168.13.140:80;
 }
 
 server {

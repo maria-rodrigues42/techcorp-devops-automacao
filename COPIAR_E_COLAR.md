@@ -71,8 +71,8 @@ sysctl -p /etc/sysctl.d/99-techcorp.conf >/dev/null 2>&1
 # Load Balancer
 cat > /etc/nginx/sites-available/lb << NGINX
 upstream backends {
-    server 192.168.13.201:80;
-    server 192.168.13.202:80;
+    # Servidor web dedicado (webserver)
+    server 192.168.13.140:80;
 }
 server {
     listen 80 default_server;
@@ -206,9 +206,9 @@ echo "nameserver 8.8.8.8" > /etc/resolv.conf
 useradd -m -s /bin/bash sysadmin 2>/dev/null
 echo "sysadmin ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/sysadmin
 
-# SSH + Docker + Java + Git
+# SSH + Docker + Java 17 + Git
 apt-get update -y >/dev/null 2>&1
-apt-get install -y openssh-server curl docker.io git openjdk-21-jdk >/dev/null 2>&1
+apt-get install -y openssh-server curl docker.io git openjdk-17-jdk >/dev/null 2>&1
 systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null
 systemctl enable --now docker
 usermod -aG docker sysadmin
@@ -274,9 +274,9 @@ echo "nameserver 8.8.8.8" > /etc/resolv.conf
 useradd -m -s /bin/bash sysadmin 2>/dev/null
 echo "sysadmin ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/sysadmin
 
-# SSH + Docker + Java + Git
+# SSH + Docker + Node.js + Git (dev02 = frontend)
 apt-get update -y >/dev/null 2>&1
-apt-get install -y openssh-server curl docker.io git openjdk-21-jdk >/dev/null 2>&1
+apt-get install -y openssh-server curl docker.io git nodejs npm >/dev/null 2>&1
 systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null
 systemctl enable --now docker
 usermod -aG docker sysadmin
@@ -293,7 +293,7 @@ echo "=========================================="
 echo "  DEV02 CONFIGURADO!"
 echo "  IP: 192.168.13.202"
 echo "  Docker: $(docker --version)"
-echo "  Java: $(java --version 2>&1 | head -1)"
+echo "  Node: $(node --version 2>&1)"
 echo "=========================================="
 '
 ```
@@ -428,6 +428,30 @@ echo "=========================================="
 
 ---
 
+## 5b. NOVAS VMs — DNS, GitLab, Webserver, DB Server
+
+Essas VMs têm configuração mais longa (bind9, GitLab, MariaDB), então use os
+**scripts dedicados** em vez de colar tudo no terminal. Em cada VM:
+
+```bash
+# Monte a pasta compartilhada e copie os scripts (uma vez por VM)
+sudo mount -t vboxsf devops-workstation /mnt && cp /mnt/setup-*.sh ~/ && chmod +x ~/setup-*.sh
+
+# DNS (192.168.13.53)
+sudo ./setup-dns.sh
+
+# GitLab (192.168.13.100) — leva alguns minutos no 1º boot
+sudo ./setup-gitlab.sh
+
+# Webserver (192.168.13.140)
+sudo ./setup-webserver.sh
+
+# DB Server (192.168.13.130)
+sudo ./setup-dbserver.sh
+```
+
+---
+
 ## 6. VERIFICAR TUDO (na Operação ou qualquer VM)
 
 Cole este bloco no terminal:
@@ -438,11 +462,15 @@ echo "  Verificando todas as máquinas"
 echo "=========================================="
 echo
 
-for IP in 192.168.13.101 192.168.13.151 192.168.13.201 192.168.13.202 192.168.13.150; do
+for IP in 192.168.13.101 192.168.13.53 192.168.13.100 192.168.13.151 192.168.13.140 192.168.13.130 192.168.13.201 192.168.13.202 192.168.13.150; do
   NOME=""
   case $IP in
     192.168.13.101) NOME="gateway" ;;
+    192.168.13.53)  NOME="dns" ;;
+    192.168.13.100) NOME="gitlab" ;;
     192.168.13.151) NOME="operacao" ;;
+    192.168.13.140) NOME="webserver" ;;
+    192.168.13.130) NOME="dbserver" ;;
     192.168.13.201) NOME="dev01" ;;
     192.168.13.202) NOME="dev02" ;;
     192.168.13.150) NOME="homologacao" ;;

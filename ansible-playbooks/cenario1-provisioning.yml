@@ -6,7 +6,7 @@
 # O que este playbook faz:
 #   1. Instala dependências de sistema (git, curl, build-essential, etc.)
 #   2. Instala Docker e garante que o serviço está rodando
-#   3. Configura o ambiente backend (JDK 21 para Spring Boot)
+#   3. Configura o ambiente backend (JDK 17 para Spring Boot)
 #   4. Gera chave SSH e cadastra no GitLab automaticamente
 #   5. Configura Git com nome/email do desenvolvedor
 #   6. Instala VS Code + extensões essenciais
@@ -27,7 +27,7 @@
 
     # Versões das ferramentas
     docker_compose_version: "2.24.0"
-    jdk_version: "21"
+    jdk_version: "17"
 
   tasks:
     # ================== PASSEIO 1: Dependências do Sistema ==================
@@ -120,40 +120,57 @@
       register: docker_test
       changed_when: false
 
-    # ================== PASSEIO 3: Ambiente Backend (JDK) ==================
-    - name: "3.1 - Instalar OpenJDK {{ jdk_version }}"
+    # ============ PASSEIO 3: Ambiente por perfil (backend/frontend) ============
+    # dev01 = backend (Java/Spring Boot)  |  dev02 = frontend (Node.js)
+    - name: "3.1 - Instalar OpenJDK {{ jdk_version }} (backend)"
       apt:
         name: "openjdk-{{ jdk_version }}-jdk"
         state: present
+      when: dev_stack | default('backend') == 'backend'
 
-    - name: "3.2 - Configurar JAVA_HOME"
+    - name: "3.2 - Configurar JAVA_HOME (backend)"
       lineinfile:
         path: "/home/{{ dev_user }}/.bashrc"
         line: "export JAVA_HOME=/usr/lib/jvm/java-{{ jdk_version }}-openjdk-amd64"
         create: yes
+      when: dev_stack | default('backend') == 'backend'
 
-    - name: "3.3 - Verificar instalação do Java"
+    - name: "3.3 - Verificar instalação do Java (backend)"
       command: java --version
       register: java_check
       changed_when: false
+      when: dev_stack | default('backend') == 'backend'
 
-    - name: "3.4 - Instalar Maven (build tool para Spring Boot)"
+    - name: "3.4 - Instalar Maven (backend)"
       apt:
         name: maven
         state: present
+      when: dev_stack | default('backend') == 'backend'
 
-    - name: "3.5 - Instalar Gradle"
+    - name: "3.5 - Baixar Gradle (backend)"
       get_url:
         url: "https://services.gradle.org/distributions/gradle-8.5-bin.zip"
         dest: "/tmp/gradle-8.5-bin.zip"
-      when: ansible_os_family == "Debian"
+      when:
+        - ansible_os_family == "Debian"
+        - dev_stack | default('backend') == 'backend'
 
-    - name: "3.6 - Extrair Gradle"
+    - name: "3.6 - Extrair Gradle (backend)"
       unarchive:
         src: /tmp/gradle-8.5-bin.zip
         dest: /opt
         remote_src: yes
-      when: ansible_os_family == "Debian"
+      when:
+        - ansible_os_family == "Debian"
+        - dev_stack | default('backend') == 'backend'
+
+    - name: "3.7 - Instalar Node.js LTS + npm (frontend)"
+      apt:
+        name:
+          - nodejs
+          - npm
+        state: present
+      when: dev_stack | default('backend') == 'frontend'
 
     # ================== PASSEIO 4: Chave SSH + GitLab ==================
     - name: "4.1 - Criar diretório .ssh"

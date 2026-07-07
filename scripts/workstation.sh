@@ -133,12 +133,12 @@ if [[ ! -d "/home/${SUDO_USER:-$USER}/.sdkman" ]]; then
   sudo -u "${SUDO_USER:-$USER}" bash -c '
     curl -s "https://get.sdkman.io" | bash
     source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk install java 21.0.2-tem
+    sdk install java 17.0.10-tem
     sdk install maven
     sdk install gradle
   '
 fi
-ok "Java 21 + Maven + Gradle instalados"
+ok "Java 17 + Maven + Gradle instalados"
 
 # ================== Terminais ==================
 log "Instalando terminais e utilitários..."
