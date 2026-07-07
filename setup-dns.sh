@@ -23,8 +23,7 @@ WEBSERVER_IP="192.168.13.140"
 DBSERVER_IP="192.168.13.201"
 DOMAIN="techcorp.com.br"
 ADMIN="sysadmin"
-DNS1="8.8.8.8"
-DNS2="1.1.1.1"
+DNS1="10.119.50.7"
 
 # ================== Cores ==================
 RED='\033[0;31m'
@@ -100,7 +99,6 @@ ok "/etc/hosts configurado"
 log "4/7 - Configurando DNS..."
 cat > /etc/resolv.conf << EOF
 nameserver ${DNS1}
-nameserver ${DNS2}
 EOF
 
 ok "DNS configurado"
@@ -147,7 +145,6 @@ options {
 
     forwarders {
         ${DNS1};
-        ${DNS2};
     };
     forward only;
 
@@ -225,10 +222,9 @@ named-checkzone "13.168.192.in-addr.arpa" "/etc/bind/db.192.168.13" || die "Erro
 systemctl enable --now named 2>/dev/null || systemctl enable --now bind9 2>/dev/null
 systemctl restart named 2>/dev/null || systemctl restart bind9 2>/dev/null
 
-# O próprio servidor DNS passa a usar a si mesmo
+# O próprio servidor DNS passa a usar a si mesmo (bind9 local, que encaminha para ${DNS1})
 cat > /etc/resolv.conf << EOF
 nameserver 127.0.0.1
-nameserver ${DNS1}
 EOF
 
 ok "bind9 configurado"

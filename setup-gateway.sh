@@ -23,8 +23,7 @@ WEBSERVER_IP="192.168.13.140"
 DBSERVER_IP="192.168.13.201"
 DOMAIN="techcorp.com.br"
 ADMIN="sysadmin"
-DNS1="8.8.8.8"
-DNS2="1.1.1.1"
+DNS1="10.119.50.7"
 
 # ================== Cores ==================
 RED='\033[0;31m'
