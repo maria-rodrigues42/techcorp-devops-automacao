@@ -22,13 +22,13 @@ A empresa tem 9 máquinas virtuais:
 |---------|-----|---------------|
 | **Gateway** | 192.168.13.101 | É o "roteador" - dá internet para todas as outras e distribui o trabalho |
 | **DNS** | 192.168.13.53 | Traduz nomes (ex.: homologacao.techcorp.com.br) em IPs |
-| **GitLab** | 192.168.13.100 | Guarda o código e roda o CI (via Docker) |
+| **GitLab** | 192.168.13.202 | Guarda o código e roda o CI (via Docker) |
 | **Operação** | 192.168.13.151 | É o "chefe" - controla e configura todas as outras remotamente |
 | **Webserver** | 192.168.13.140 | Servidor web dedicado (nginx) |
-| **DB Server** | 192.168.13.130 | Servidor de banco de dados (MariaDB) |
+| **DB Server** | 192.168.13.201 | Servidor de banco de dados (MariaDB) |
 | **Homologação** | 192.168.13.150 | Onde testamos o programa completo antes de entregar (tudo-em-um) |
-| **Dev01** | 192.168.13.201 | Máquina do programador backend (Java 17) |
-| **Dev02** | 192.168.13.202 | Máquina do programador frontend (Node.js) |
+| **Dev01** | 192.168.13.203 | Máquina do programador backend (Java 17) |
+| **Dev02** | 192.168.13.204 | Máquina do programador frontend (Node.js) |
 
 ---
 
@@ -185,8 +185,8 @@ Vai aparecer algo assim:
 1. Teste de rede (ping)
   ✓ gateway (192.168.13.101)
   ✓ operacao (192.168.13.151)
-  ✓ dev01 (192.168.13.201)
-  ✓ dev02 (192.168.13.202)
+  ✓ dev01 (192.168.13.203)
+  ✓ dev02 (192.168.13.204)
   ✓ homologacao (192.168.13.150)
 
 2. Teste SSH

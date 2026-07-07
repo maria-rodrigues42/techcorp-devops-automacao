@@ -2,7 +2,7 @@
 #
 # setup-dbserver.sh - Configuração completa da máquina DB SERVER
 #
-# IP: 192.168.13.130
+# IP: 192.168.13.201
 # Função: Servidor de Banco de Dados (MariaDB)
 #
 # Uso: sudo ./setup-dbserver.sh
@@ -10,17 +10,17 @@
 set -uo pipefail
 
 # ================== Configurações Fixas ==================
-IP="192.168.13.130"
+IP="192.168.13.201"
 NETMASK="255.255.255.0"
 GW_IP="192.168.13.101"
 OP_IP="192.168.13.151"
-DEV01_IP="192.168.13.201"
-DEV02_IP="192.168.13.202"
+DEV01_IP="192.168.13.203"
+DEV02_IP="192.168.13.204"
 HOMOLOGACAO_IP="192.168.13.150"
 DNS_IP="192.168.13.53"
-GITLAB_IP="192.168.13.100"
+GITLAB_IP="192.168.13.202"
 WEBSERVER_IP="192.168.13.140"
-DBSERVER_IP="192.168.13.130"
+DBSERVER_IP="192.168.13.201"
 DOMAIN="techcorp.com.br"
 ADMIN="sysadmin"
 DNS1="8.8.8.8"

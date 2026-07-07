@@ -88,12 +88,12 @@ run_in_vm() {
   case "$vm_name" in
     gateway)     vm_ip="192.168.13.101" ;;
     dns)         vm_ip="192.168.13.53"  ;;
-    dbserver)    vm_ip="192.168.13.130" ;;
-    gitlab)      vm_ip="192.168.13.100" ;;
+    dbserver)    vm_ip="192.168.13.201" ;;
+    gitlab)      vm_ip="192.168.13.202" ;;
     operacao)    vm_ip="192.168.13.151" ;;
     webserver)   vm_ip="192.168.13.140" ;;
-    dev01)       vm_ip="192.168.13.201" ;;
-    dev02)       vm_ip="192.168.13.202" ;;
+    dev01)       vm_ip="192.168.13.203" ;;
+    dev02)       vm_ip="192.168.13.204" ;;
   esac
 
   # Tentar SSH
@@ -140,12 +140,12 @@ for VM in gateway dns dbserver gitlab operacao webserver dev01 dev02; do
   case "$VM" in
     gateway)   IP="192.168.13.101" ;;
     dns)       IP="192.168.13.53"  ;;
-    dbserver)  IP="192.168.13.130" ;;
-    gitlab)    IP="192.168.13.100" ;;
+    dbserver)  IP="192.168.13.201" ;;
+    gitlab)    IP="192.168.13.202" ;;
     operacao)  IP="192.168.13.151" ;;
     webserver) IP="192.168.13.140" ;;
-    dev01)     IP="192.168.13.201" ;;
-    dev02)     IP="192.168.13.202" ;;
+    dev01)     IP="192.168.13.203" ;;
+    dev02)     IP="192.168.13.204" ;;
   esac
 
   if ping -c1 -W2 "$IP" >/dev/null 2>&1; then
@@ -198,8 +198,8 @@ fi
 echo
 
 # DB Server
-if ping -c1 -W2 192.168.13.130 >/dev/null 2>&1; then
-  setup_vm "dbserver" "setup-dbserver.sh" "192.168.13.130"
+if ping -c1 -W2 192.168.13.201 >/dev/null 2>&1; then
+  setup_vm "dbserver" "setup-dbserver.sh" "192.168.13.201"
 else
   warn "Pulando DB Server (offline)"
 fi
@@ -207,8 +207,8 @@ fi
 echo
 
 # GitLab
-if ping -c1 -W2 192.168.13.100 >/dev/null 2>&1; then
-  setup_vm "gitlab" "setup-gitlab.sh" "192.168.13.100"
+if ping -c1 -W2 192.168.13.202 >/dev/null 2>&1; then
+  setup_vm "gitlab" "setup-gitlab.sh" "192.168.13.202"
 else
   warn "Pulando GitLab (offline)"
 fi
@@ -234,8 +234,8 @@ fi
 echo
 
 # 3. Dev01
-if ping -c1 -W2 192.168.13.201 >/dev/null 2>&1; then
-  setup_vm "dev01" "setup-dev01.sh" "192.168.13.201"
+if ping -c1 -W2 192.168.13.203 >/dev/null 2>&1; then
+  setup_vm "dev01" "setup-dev01.sh" "192.168.13.203"
 else
   warn "Pulando Dev01 (offline)"
 fi
@@ -243,8 +243,8 @@ fi
 echo
 
 # 4. Dev02
-if ping -c1 -W2 192.168.13.202 >/dev/null 2>&1; then
-  setup_vm "dev02" "setup-dev02.sh" "192.168.13.202"
+if ping -c1 -W2 192.168.13.204 >/dev/null 2>&1; then
+  setup_vm "dev02" "setup-dev02.sh" "192.168.13.204"
 else
   warn "Pulando Dev02 (offline)"
 fi

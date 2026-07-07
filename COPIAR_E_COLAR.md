@@ -33,8 +33,8 @@ cat > /etc/hosts << EOF
 127.0.0.1   localhost
 192.168.13.101   gateway
 192.168.13.151   operacao
-192.168.13.201   dev01
-192.168.13.202   dev02
+192.168.13.203   dev01
+192.168.13.204   dev02
 192.168.13.150   homologacao
 EOF
 
@@ -127,8 +127,8 @@ cat > /etc/hosts << EOF
 127.0.0.1   localhost
 192.168.13.101   gateway
 192.168.13.151   operacao
-192.168.13.201   dev01
-192.168.13.202   dev02
+192.168.13.203   dev01
+192.168.13.204   dev02
 192.168.13.150   homologacao
 EOF
 
@@ -170,7 +170,7 @@ Cole este bloco COMPLETO no terminal:
 
 ```bash
 sudo bash -c '
-IP="192.168.13.201"
+IP="192.168.13.203"
 GW="192.168.13.101"
 
 # Rede
@@ -194,8 +194,8 @@ cat > /etc/hosts << EOF
 127.0.0.1   localhost
 192.168.13.101   gateway
 192.168.13.151   operacao
-192.168.13.201   dev01
-192.168.13.202   dev02
+192.168.13.203   dev01
+192.168.13.204   dev02
 192.168.13.150   homologacao
 EOF
 
@@ -223,7 +223,7 @@ chown -R sysadmin:sysadmin /home/sysadmin/.ssh
 
 echo "=========================================="
 echo "  DEV01 CONFIGURADO!"
-echo "  IP: 192.168.13.201"
+echo "  IP: 192.168.13.203"
 echo "  Docker: $(docker --version)"
 echo "  Java: $(java --version 2>&1 | head -1)"
 echo "=========================================="
@@ -238,7 +238,7 @@ Cole este bloco COMPLETO no terminal:
 
 ```bash
 sudo bash -c '
-IP="192.168.13.202"
+IP="192.168.13.204"
 GW="192.168.13.101"
 
 # Rede
@@ -262,8 +262,8 @@ cat > /etc/hosts << EOF
 127.0.0.1   localhost
 192.168.13.101   gateway
 192.168.13.151   operacao
-192.168.13.201   dev01
-192.168.13.202   dev02
+192.168.13.203   dev01
+192.168.13.204   dev02
 192.168.13.150   homologacao
 EOF
 
@@ -291,7 +291,7 @@ chown -R sysadmin:sysadmin /home/sysadmin/.ssh
 
 echo "=========================================="
 echo "  DEV02 CONFIGURADO!"
-echo "  IP: 192.168.13.202"
+echo "  IP: 192.168.13.204"
 echo "  Docker: $(docker --version)"
 echo "  Node: $(node --version 2>&1)"
 echo "=========================================="
@@ -330,8 +330,8 @@ cat > /etc/hosts << EOF
 127.0.0.1   localhost
 192.168.13.101   gateway
 192.168.13.151   operacao
-192.168.13.201   dev01
-192.168.13.202   dev02
+192.168.13.203   dev01
+192.168.13.204   dev02
 192.168.13.150   homologacao
 EOF
 
@@ -440,13 +440,13 @@ sudo mount -t vboxsf devops-workstation /mnt && cp /mnt/setup-*.sh ~/ && chmod +
 # DNS (192.168.13.53)
 sudo ./setup-dns.sh
 
-# GitLab (192.168.13.100) — leva alguns minutos no 1º boot
+# GitLab (192.168.13.202) — leva alguns minutos no 1º boot
 sudo ./setup-gitlab.sh
 
 # Webserver (192.168.13.140)
 sudo ./setup-webserver.sh
 
-# DB Server (192.168.13.130)
+# DB Server (192.168.13.201)
 sudo ./setup-dbserver.sh
 ```
 
@@ -462,17 +462,17 @@ echo "  Verificando todas as máquinas"
 echo "=========================================="
 echo
 
-for IP in 192.168.13.101 192.168.13.53 192.168.13.100 192.168.13.151 192.168.13.140 192.168.13.130 192.168.13.201 192.168.13.202 192.168.13.150; do
+for IP in 192.168.13.101 192.168.13.53 192.168.13.202 192.168.13.151 192.168.13.140 192.168.13.201 192.168.13.203 192.168.13.204 192.168.13.150; do
   NOME=""
   case $IP in
     192.168.13.101) NOME="gateway" ;;
     192.168.13.53)  NOME="dns" ;;
-    192.168.13.100) NOME="gitlab" ;;
+    192.168.13.202) NOME="gitlab" ;;
     192.168.13.151) NOME="operacao" ;;
     192.168.13.140) NOME="webserver" ;;
-    192.168.13.130) NOME="dbserver" ;;
-    192.168.13.201) NOME="dev01" ;;
-    192.168.13.202) NOME="dev02" ;;
+    192.168.13.201) NOME="dbserver" ;;
+    192.168.13.203) NOME="dev01" ;;
+    192.168.13.204) NOME="dev02" ;;
     192.168.13.150) NOME="homologacao" ;;
   esac
   if ping -c1 -W2 $IP >/dev/null 2>&1; then

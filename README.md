@@ -10,13 +10,13 @@ Rede interna: `192.168.13.0/24` — domínio `techcorp.com.br`.
 |---------|-----|---------------------------------|
 | **gateway** | 192.168.13.101 | Roteador/NAT (dá internet para a LAN) + load balancer nginx |
 | **dns** | 192.168.13.53 | Servidor DNS (bind9) autoritativo de `techcorp.com.br` |
-| **gitlab** | 192.168.13.100 | GitLab CE (código, CI, registry) — via Docker |
+| **gitlab** | 192.168.13.202 | GitLab CE (código, CI, registry) — via Docker |
 | **operacao** | 192.168.13.151 | Control node Ansible (provisiona e faz deploy de tudo) |
 | **webserver** | 192.168.13.140 | Servidor web nginx dedicado |
-| **dbserver** | 192.168.13.130 | Servidor de banco MariaDB |
+| **dbserver** | 192.168.13.201 | Servidor de banco MariaDB |
 | **homologacao** | 192.168.13.150 | Ambiente de homologação **all-in-one** (frontend + backend + banco em containers) |
-| **dev01** | 192.168.13.201 | Estação de desenvolvimento **backend** (Java 17 / Spring Boot) |
-| **dev02** | 192.168.13.202 | Estação de desenvolvimento **frontend** (Node.js) |
+| **dev01** | 192.168.13.203 | Estação de desenvolvimento **backend** (Java 17 / Spring Boot) |
+| **dev02** | 192.168.13.204 | Estação de desenvolvimento **frontend** (Node.js) |
 
 > **Sem ambiente de produção.** Este projeto vai até a homologação. A homologação continua completa (all-in-one); as máquinas `dns`, `gitlab`, `webserver` e `dbserver` são serviços dedicados adicionados à rede, cada um com uma responsabilidade.
 
@@ -186,11 +186,11 @@ techcorp-devops-automacao/
 |---------|-----|-------|
 | Load Balancer (gateway) | http://192.168.13.101 | 80 |
 | Webserver (nginx) | http://192.168.13.140 | 80 |
-| GitLab | http://192.168.13.100 | 80 |
+| GitLab | http://192.168.13.202 | 80 |
 | Frontend (homologação) | http://192.168.13.150 | 80 |
 | Backend API (homologação) | http://192.168.13.150:8080 | 8080 |
 | Banco homologação (MySQL) | 192.168.13.150:3306 | 3306 |
-| DB Server (MariaDB) | 192.168.13.130:3306 | 3306 |
+| DB Server (MariaDB) | 192.168.13.201:3306 | 3306 |
 | DNS (bind9) | 192.168.13.53 | 53 |
 | Health Check | http://192.168.13.150:8080/api/health | - |
 
@@ -212,7 +212,7 @@ curl http://192.168.13.150:8080/api/health | jq .
 dig @192.168.13.53 homologacao.techcorp.com.br
 
 # Conectar no servidor de banco MariaDB
-mysql -h 192.168.13.130 -u app_user -p techcorp_homologacao
+mysql -h 192.168.13.201 -u app_user -p techcorp_homologacao
 
 # Reiniciar apenas o backend
 docker restart techcorp-backend

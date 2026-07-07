@@ -2,7 +2,7 @@
 #
 # setup-gitlab.sh - Configuração completa da máquina GITLAB
 #
-# IP: 192.168.13.100
+# IP: 192.168.13.202
 # Função: Servidor GitLab CE (código, CI, registry)
 #
 # Uso: sudo ./setup-gitlab.sh
@@ -13,17 +13,17 @@
 set -uo pipefail
 
 # ================== Configurações Fixas ==================
-IP="192.168.13.100"
+IP="192.168.13.202"
 NETMASK="255.255.255.0"
 GW_IP="192.168.13.101"
 OP_IP="192.168.13.151"
-DEV01_IP="192.168.13.201"
-DEV02_IP="192.168.13.202"
+DEV01_IP="192.168.13.203"
+DEV02_IP="192.168.13.204"
 HOMOLOGACAO_IP="192.168.13.150"
 DNS_IP="192.168.13.53"
-GITLAB_IP="192.168.13.100"
+GITLAB_IP="192.168.13.202"
 WEBSERVER_IP="192.168.13.140"
-DBSERVER_IP="192.168.13.130"
+DBSERVER_IP="192.168.13.201"
 DOMAIN="techcorp.com.br"
 ADMIN="sysadmin"
 DNS1="8.8.8.8"
